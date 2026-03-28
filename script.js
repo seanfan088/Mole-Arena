@@ -3,6 +3,10 @@ import { createYoloHttpBridge } from './yolo_bridge_client.js';
 
 const humanBoard = document.getElementById('human-board');
 const aiBoard = document.getElementById('ai-board');
+const bgmEl = document.getElementById('bgm');
+const roundEndAudioEl = document.getElementById('round-end-audio');
+const missHitAudioEl = document.getElementById('miss-hit-audio');
+const hitSuccessAudioEl = document.getElementById('hit-success-audio');
 const cameraFeed = document.getElementById('camera-feed');
 const cameraPreview = document.getElementById('camera-preview');
 const handOverlay = document.getElementById('hand-overlay');
@@ -46,6 +50,8 @@ const HAND_MODEL =
   'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 const YOLO_HTTP_ENDPOINT =
   window.localStorage.getItem('mole-arena-yolo-endpoint') || 'http://127.0.0.1:8765/api/detections';
+
+const audioCtx = window.AudioContext ? new AudioContext() : null;
 
 const state = {
   status: 'ready',
@@ -116,6 +122,102 @@ function createBoardState(owner) {
       locked: false,
     })),
   };
+}
+
+function ensureAudioReady() {
+  if (!audioCtx) {
+    return;
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+}
+
+function playTone({ frequency = 440, duration = 0.08, type = 'square', gain = 0.05, sweep = 0 } = {}) {
+  if (!audioCtx) {
+    return;
+  }
+  ensureAudioReady();
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const amp = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(frequency, now);
+  if (sweep) {
+    osc.frequency.linearRampToValueAtTime(frequency + sweep, now + duration);
+  }
+  amp.gain.setValueAtTime(0.001, now);
+  amp.gain.exponentialRampToValueAtTime(gain, now + 0.01);
+  amp.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  osc.connect(amp);
+  amp.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + duration + 0.02);
+}
+
+function playHitSound(kind = 'good') {
+  ensureAudioReady();
+  if (kind === 'good') {
+    if (hitSuccessAudioEl) {
+      try {
+        hitSuccessAudioEl.currentTime = 0;
+        hitSuccessAudioEl.volume = 0.9;
+        hitSuccessAudioEl.play().catch(() => {});
+        return;
+      } catch {
+        // Fall back to synthesized cue.
+      }
+    }
+    playTone({ frequency: 440, duration: 0.06, type: 'square', gain: 0.07, sweep: 140 });
+    window.setTimeout(() => playTone({ frequency: 620, duration: 0.07, type: 'triangle', gain: 0.05, sweep: 90 }), 30);
+    return;
+  }
+  if (missHitAudioEl) {
+    try {
+      missHitAudioEl.currentTime = 0;
+      missHitAudioEl.volume = 0.85;
+      missHitAudioEl.play().catch(() => {});
+      return;
+    } catch {
+      // Fall back to synthesized cue.
+    }
+  }
+  playTone({ frequency: 180, duration: 0.12, type: 'sawtooth', gain: 0.06, sweep: -60 });
+}
+
+function playRoundEndSound() {
+  ensureAudioReady();
+  if (roundEndAudioEl) {
+    try {
+      roundEndAudioEl.currentTime = 0;
+      roundEndAudioEl.volume = 0.9;
+      roundEndAudioEl.play().catch(() => {});
+      return;
+    } catch {
+      // Fall back to synthesized cue.
+    }
+  }
+  playTone({ frequency: 520, duration: 0.08, type: 'triangle', gain: 0.05, sweep: 40 });
+  window.setTimeout(() => playTone({ frequency: 660, duration: 0.08, type: 'triangle', gain: 0.05, sweep: 20 }), 90);
+}
+
+async function startBgm() {
+  ensureAudioReady();
+  if (!bgmEl) {
+    return;
+  }
+  bgmEl.volume = 0.45;
+  try {
+    await bgmEl.play();
+  } catch {
+    // Browser gesture restrictions are expected on first load.
+  }
+}
+
+function pauseBgm() {
+  if (bgmEl) {
+    bgmEl.pause();
+  }
 }
 
 function loadHistory() {
@@ -749,6 +851,7 @@ function publishBridgeContract() {
 function resetMatch() {
   stopTimers();
   stopAIVisionBridge();
+  pauseBgm();
   state.status = 'ready';
   state.durationSec = Number(durationSelect.value);
   state.difficulty = Number(difficultyRange.value);
@@ -774,6 +877,8 @@ function resetMatch() {
 }
 
 function startMatch() {
+  ensureAudioReady();
+  startBgm();
   if (state.status === 'playing') {
     return;
   }
@@ -901,6 +1006,7 @@ function strikeHole(side, holeIndex, source) {
 
   if (!hole.active) {
     player.misses += 1;
+    playHitSound('bad');
     flashHole(hole.element, 'bad');
     updateHud();
     renderSensorLayers();
@@ -925,6 +1031,7 @@ function strikeHole(side, holeIndex, source) {
   hole.locked = false;
   hole.element.classList.remove('active', 'ai-lock', 'hand-target');
   hole.element.querySelector('.mole').className = 'mole normal';
+  playHitSound(delta > 0 ? 'good' : 'bad');
   flashHole(hole.element, delta > 0 ? 'good' : 'bad');
   updateHud();
   renderSensorLayers();
@@ -1015,6 +1122,8 @@ function finishRound() {
     state.ai.roundWins >= targetWins;
 
   if (matchDone) {
+    playRoundEndSound();
+    pauseBgm();
     state.status = 'match_result';
     const finalWinner =
       state.human.roundWins === state.ai.roundWins
@@ -1062,6 +1171,7 @@ function togglePause() {
     state.status = 'paused';
     stopTimers();
     stopAIVisionBridge();
+    pauseBgm();
     setOverlay('Paused', 'Round Paused', '已冻结时间、地鼠刷新和 AI 行为。');
     updateHud();
     renderSensorLayers();
@@ -1069,6 +1179,7 @@ function togglePause() {
   }
 
   if (state.status === 'paused') {
+    startBgm();
     state.status = 'playing';
     state.lastTickAt = performance.now();
     setOverlay('Round Live', 'Back To Game', '继续当前这一局。', false);
