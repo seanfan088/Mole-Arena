@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YOLO Bridge Demo</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: sans-serif;
+        background: #121212;
+        color: #f2f2f2;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+      }
+      .panel {
+        width: min(720px, calc(100vw - 32px));
+        padding: 24px;
+        border-radius: 20px;
+        background: #1d1d1d;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      }
+      button {
+        margin-right: 10px;
+        margin-bottom: 10px;
+        padding: 10px 14px;
+        border: 0;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      pre {
+        white-space: pre-wrap;
+        background: #0c0c0c;
+        padding: 14px;
+        border-radius: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="panel">
+      <h1>YOLO Bridge Demo</h1>
+      <p>先打开主游戏页，再点击下面按钮，向游戏页面注入模拟检测结果。</p>
+      <button id="send-one">Send Mole Detection</button>
+      <button id="send-mix">Send Mixed Detections</button>
+      <button id="send-status">Send Status</button>
+      <pre id="log">Waiting...</pre>
+    </div>
+
+    <script>
+      const log = document.getElementById('log');
+
+      function send(payload) {
+        window.opener?.postMessage(payload, '*');
+        log.textContent = JSON.stringify(payload, null, 2);
+      }
+
+      document.getElementById('send-one').addEventListener('click', () => {
+        send({
+          type: 'YOLO_DETECTIONS',
+          detections: [{ holeIndex: 2, label: 'mole', confidence: 0.94 }],
+        });
+      });
+
+      document.getElementById('send-mix').addEventListener('click', () => {
+        send({
+          type: 'YOLO_DETECTIONS',
+          detections: [
+            { holeIndex: 1, label: 'bomb', confidence: 0.82 },
+            { holeIndex: 5, label: 'mole', confidence: 0.97 },
+          ],
+        });
+      });
+
+      document.getElementById('send-status').addEventListener('click', () => {
+        send({
+          type: 'YOLO_BRIDGE_STATUS',
+          state: 'external-ready',
+          protocol: 'window.postMessage',
+        });
+      });
+    </script>
+  </body>
+</html>

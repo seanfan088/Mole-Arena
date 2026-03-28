@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mole Arena - Human vs AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Audiowide&family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar panel">
+        <section class="score-side human-side">
+          <p class="side-label">Human</p>
+          <div class="score-line">
+            <strong id="human-score">0</strong>
+            <span id="human-hit-rate">Hit 0%</span>
+          </div>
+        </section>
+
+        <section class="center-status">
+          <p class="eyebrow">Mole Arena</p>
+          <h1>Human vs AI</h1>
+          <div class="center-metrics">
+            <article>
+              <span>Round</span>
+              <strong id="round-label">1 / 1</strong>
+            </article>
+            <article>
+              <span>Time Left</span>
+              <strong id="time-left">60s</strong>
+            </article>
+            <article>
+              <span>Status</span>
+              <strong id="game-status">Ready</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="score-side ai-side">
+          <p class="side-label">AI</p>
+          <div class="score-line">
+            <strong id="ai-score">0</strong>
+            <span id="ai-hit-rate">Hit 0%</span>
+          </div>
+        </section>
+      </header>
+
+      <section class="arena-row strike-row">
+        <section class="arena panel">
+          <div class="arena-heading">
+            <div>
+              <p class="panel-tag">Camera Hand Tracking</p>
+              <h2>Human Strike Zone</h2>
+            </div>
+            <div class="mini-stats">
+              <span id="human-hits">Hits 0</span>
+              <span id="human-misses">Miss 0</span>
+            </div>
+          </div>
+          <div class="board-stack">
+            <video id="camera-feed" class="camera-feed" autoplay playsinline muted></video>
+            <canvas id="hand-overlay" class="hand-overlay" width="960" height="540"></canvas>
+            <div id="human-board" class="board human-board" aria-label="Human whack-a-mole board"></div>
+            <div class="capture-badge">
+              <span class="capture-dot"></span>
+              <strong id="capture-text">Hand Tracker Standby</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="arena panel">
+          <div class="arena-heading">
+            <div>
+              <p class="panel-tag">YOLO Auto Player</p>
+              <h2>AI Strike Zone</h2>
+            </div>
+            <div class="mini-stats">
+              <span id="ai-hits">Hits 0</span>
+              <span id="ai-misses">Miss 0</span>
+            </div>
+          </div>
+          <div class="board-stack">
+            <canvas id="ai-vision-overlay" class="vision-overlay" width="960" height="540"></canvas>
+            <div id="ai-board" class="board ai-board" aria-label="AI whack-a-mole board"></div>
+          </div>
+        </section>
+      </section>
+
+      <section class="controls-row">
+        <section class="controls-panel panel">
+          <div class="control-group compact-group">
+            <label for="duration-select">Game Time</label>
+            <select id="duration-select">
+              <option value="30">30s</option>
+              <option value="45">45s</option>
+              <option value="60" selected>60s</option>
+              <option value="90">90s</option>
+              <option value="120">120s</option>
+            </select>
+          </div>
+
+          <div class="control-group compact-group">
+            <label for="difficulty-range">Difficulty 1-10</label>
+            <div class="range-wrap">
+              <input id="difficulty-range" type="range" min="1" max="10" value="5" />
+              <strong id="difficulty-value">5</strong>
+            </div>
+          </div>
+
+          <div class="control-group compact-group">
+            <label for="rounds-select">Match Mode</label>
+            <select id="rounds-select">
+              <option value="1" selected>Single Round</option>
+              <option value="3">Best of 3</option>
+              <option value="5">Best of 5</option>
+            </select>
+          </div>
+
+          <div class="control-group buttons-group">
+            <button id="start-button" class="primary-btn">Start</button>
+            <button id="pause-button" class="ghost-btn">Pause</button>
+            <button id="reset-button" class="ghost-btn">Reset</button>
+          </div>
+        </section>
+
+        <aside class="history-panel panel">
+          <div class="history-header">
+            <div>
+              <p class="panel-tag">Match Record</p>
+              <h2>Round Results</h2>
+            </div>
+            <strong id="match-score">0 : 0</strong>
+          </div>
+          <div id="history-list" class="history-list">
+            <p class="empty-history">No rounds finished yet.</p>
+          </div>
+        </aside>
+      </section>
+
+      <section class="controls-row ai-status-row">
+        <section class="arena panel ai-status-panel">
+          <div class="arena-heading">
+            <div>
+              <p class="panel-tag">AI Vision Console</p>
+              <h2>Vision / Detector / Bridge</h2>
+            </div>
+          </div>
+          <div class="sensor-strip">
+            <div class="sensor-card">
+              <span>Camera</span>
+              <strong id="camera-status">Preview Demo</strong>
+            </div>
+            <div class="sensor-card">
+              <span>Hand Cursor</span>
+              <strong id="hand-status">Mouse Simulated</strong>
+            </div>
+          </div>
+          <div class="sensor-strip">
+            <div class="sensor-card">
+              <span>Vision</span>
+              <strong id="ai-vision-status">YOLO Bridge Ready</strong>
+            </div>
+            <div class="sensor-card">
+              <span>Policy</span>
+              <strong id="ai-policy-status">Auto Strike Demo</strong>
+            </div>
+          </div>
+          <div class="sensor-strip ai-bridge-strip">
+            <div class="sensor-card">
+              <span>Detector Input</span>
+              <strong id="ai-detector-mode">Synthetic YOLO</strong>
+            </div>
+            <div class="sensor-card">
+              <span>Last Detection</span>
+              <strong id="ai-last-detection">None</strong>
+            </div>
+          </div>
+          <div class="sensor-strip ai-bridge-strip">
+            <div class="sensor-card">
+              <span>Bridge Protocol</span>
+              <strong id="ai-bridge-protocol">window.postMessage</strong>
+            </div>
+            <div class="sensor-card">
+              <span>Bridge State</span>
+              <strong id="ai-bridge-state">Listening</strong>
+            </div>
+          </div>
+        </section>
+      </section>
+
+    </main>
+
+    <script type="module" src="script.js"></script>
+  </body>
+</html>
