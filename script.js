@@ -4,6 +4,7 @@ import { createYoloHttpBridge } from './yolo_bridge_client.js';
 const humanBoard = document.getElementById('human-board');
 const aiBoard = document.getElementById('ai-board');
 const cameraFeed = document.getElementById('camera-feed');
+const cameraPreview = document.getElementById('camera-preview');
 const handOverlay = document.getElementById('hand-overlay');
 const handCtx = handOverlay.getContext('2d');
 const aiVisionOverlay = document.getElementById('ai-vision-overlay');
@@ -21,7 +22,7 @@ const aiHitsEl = document.getElementById('ai-hits');
 const aiMissesEl = document.getElementById('ai-misses');
 const cameraStatusEl = document.getElementById('camera-status');
 const handStatusEl = document.getElementById('hand-status');
-const captureTextEl = document.getElementById('capture-text');
+const trackerStatusTextEl = document.getElementById('tracker-status-text');
 const aiVisionStatusEl = document.getElementById('ai-vision-status');
 const aiPolicyStatusEl = document.getElementById('ai-policy-status');
 const aiDetectorModeEl = document.getElementById('ai-detector-mode');
@@ -293,31 +294,45 @@ function drawHammerIcon(x, y, scale = 1) {
   handCtx.rotate(angle);
   handCtx.scale(scale, scale * smashScaleY);
 
-  handCtx.strokeStyle = '#072b14';
-  handCtx.lineWidth = 6;
+  handCtx.strokeStyle = '#03170a';
+  handCtx.lineWidth = 8;
   handCtx.lineJoin = 'round';
   handCtx.globalAlpha = 1;
-  handCtx.shadowColor = '#0f3d1f';
+  handCtx.shadowColor = '#0b3516';
   handCtx.shadowBlur = 0;
 
-  handCtx.fillStyle = '#00c853';
+  handCtx.fillStyle = '#00e85f';
   handCtx.beginPath();
   handCtx.roundRect(-10, -82, 20, 92, 11);
   handCtx.fill();
   handCtx.stroke();
 
-  handCtx.fillStyle = '#00ff66';
+  handCtx.strokeStyle = '#f7fff8';
+  handCtx.lineWidth = 3;
+  handCtx.beginPath();
+  handCtx.roundRect(-6, -78, 6, 74, 6);
+  handCtx.stroke();
+
+  handCtx.strokeStyle = '#03170a';
+  handCtx.lineWidth = 8;
+  handCtx.fillStyle = '#39ff14';
   handCtx.beginPath();
   handCtx.roundRect(-44, -124, 88, 34, 12);
   handCtx.fill();
   handCtx.stroke();
 
-  handCtx.fillStyle = '#b9ff4f';
+  handCtx.strokeStyle = '#f7fff8';
+  handCtx.lineWidth = 3;
   handCtx.beginPath();
-  handCtx.roundRect(-28, -114, 56, 12, 6);
+  handCtx.roundRect(-34, -118, 68, 10, 5);
+  handCtx.stroke();
+
+  handCtx.fillStyle = '#d9ff54';
+  handCtx.beginPath();
+  handCtx.roundRect(-28, -110, 56, 10, 5);
   handCtx.fill();
 
-  handCtx.fillStyle = '#0a3f1d';
+  handCtx.fillStyle = '#03170a';
   handCtx.beginPath();
   handCtx.arc(0, -106, 5, 0, Math.PI * 2);
   handCtx.fill();
@@ -470,7 +485,7 @@ function updatePointerFromEvent(event) {
   const y = ((event.clientY - rect.top) / rect.height) * handOverlay.height;
   updatePointerPosition(x, y, 'mouse');
   handStatusEl.textContent = state.pointer.speed > 14 ? 'Mouse Swipe Simulated' : 'Mouse Tracking';
-  captureTextEl.textContent = state.pointer.speed > 14 ? 'Mouse Swing Captured' : 'Mouse Tracking Active';
+  trackerStatusTextEl.textContent = state.pointer.speed > 14 ? 'Mouse Swing Captured' : 'Mouse Tracking Active';
   renderSensorLayers();
 }
 
@@ -490,12 +505,14 @@ async function setupCameraPreview() {
       audio: false,
     });
     cameraFeed.srcObject = state.cameraStream;
+    cameraPreview.srcObject = state.cameraStream;
     await cameraFeed.play().catch(() => {});
+    await cameraPreview.play().catch(() => {});
     cameraStatusEl.textContent = 'Camera Live';
-    captureTextEl.textContent = 'Camera Live · Waiting Hand';
+    trackerStatusTextEl.textContent = 'Camera Live · Waiting Hand';
   } catch {
     cameraStatusEl.textContent = 'Camera Blocked';
-    captureTextEl.textContent = 'Camera Blocked · Mouse Fallback';
+    trackerStatusTextEl.textContent = 'Camera Blocked · Mouse Fallback';
   }
 }
 
@@ -520,11 +537,11 @@ async function initHandTracking() {
     });
     state.handTrackingReady = true;
     handStatusEl.textContent = 'MediaPipe Ready';
-    captureTextEl.textContent = 'Hand Tracker Ready';
+    trackerStatusTextEl.textContent = 'Hand Tracker Ready';
     requestAnimationFrame(runHandTrackingLoop);
   } catch {
     handStatusEl.textContent = 'MediaPipe Load Failed';
-    captureTextEl.textContent = 'Tracker Load Failed';
+    trackerStatusTextEl.textContent = 'Tracker Load Failed';
   }
 }
 
@@ -573,11 +590,11 @@ function runHandTrackingLoop() {
     updatePointerPosition((1 - palm.x) * handOverlay.width, palm.y * handOverlay.height, 'hand');
     maybeTriggerHandStrike(landmarks);
     handStatusEl.textContent = 'Hand Tracking Live';
-    captureTextEl.textContent = state.pointer.speed > 18 ? 'Hand Swing Captured' : 'Hand Locked';
+    trackerStatusTextEl.textContent = state.pointer.speed > 18 ? 'Hand Swing Captured' : 'Hand Locked';
     renderSensorLayers(landmarks);
   } else {
     handStatusEl.textContent = state.handTrackingReady ? 'Show Hand To Camera' : 'Tracking Offline';
-    captureTextEl.textContent = state.handTrackingReady ? 'Show Hand To Camera' : 'Tracking Offline';
+    trackerStatusTextEl.textContent = state.handTrackingReady ? 'Show Hand To Camera' : 'Tracking Offline';
     renderSensorLayers();
   }
 

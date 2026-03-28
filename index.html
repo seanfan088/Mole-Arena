@@ -16,7 +16,8 @@
     <main class="app-shell">
       <header class="topbar panel">
         <section class="score-side human-side">
-          <p class="side-label">Human</p>
+          <p class="side-label">Human
+          </p>
           <div class="score-line">
             <strong id="human-score">0</strong>
             <span id="human-hit-rate">Hit 0%</span>
@@ -40,12 +41,20 @@
               <strong id="game-status">Ready</strong>
             </article>
           </div>
+          <div class="tracker-status-chip">
+  <span class="tracker-dot"></span>
+  <span id="tracker-status-text">Hand Tracker Standby</span>
+</div>
         </section>
 
         <section class="score-side ai-side">
           <p class="side-label">AI</p>
           <div class="score-line">
             <strong id="ai-score">0</strong>
+            <div class="camera-preview-card">
+              <span>Live Camera</span>
+              <video id="camera-preview" class="camera-preview" autoplay playsinline muted></video>
+            </div>
             <span id="ai-hit-rate">Hit 0%</span>
           </div>
         </section>
@@ -58,19 +67,18 @@
               <p class="panel-tag">Camera Hand Tracking</p>
               <h2>Human Strike Zone</h2>
             </div>
-            <div class="mini-stats">
-              <span id="human-hits">Hits 0</span>
-              <span id="human-misses">Miss 0</span>
+            <div class="heading-side">
+              <div class="mini-stats">
+                <span id="human-hits">Hits 0</span>
+                <span id="human-misses">Miss 0</span>
+              </div>
             </div>
           </div>
           <div class="board-stack">
             <video id="camera-feed" class="camera-feed" autoplay playsinline muted></video>
             <canvas id="hand-overlay" class="hand-overlay" width="960" height="540"></canvas>
             <div id="human-board" class="board human-board" aria-label="Human whack-a-mole board"></div>
-            <div class="capture-badge">
-              <span class="capture-dot"></span>
-              <strong id="capture-text">Hand Tracker Standby</strong>
-            </div>
+
           </div>
         </section>
 
