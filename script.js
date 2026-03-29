@@ -9,6 +9,8 @@ const missHitAudioEl = document.getElementById('miss-hit-audio');
 const hitSuccessAudioEl = document.getElementById('hit-success-audio');
 const cameraFeed = document.getElementById('camera-feed');
 const cameraPreview = document.getElementById('camera-preview');
+const cameraPreviewOverlay = document.getElementById('camera-preview-overlay');
+const cameraPreviewCtx = cameraPreviewOverlay.getContext('2d');
 const handOverlay = document.getElementById('hand-overlay');
 const handCtx = handOverlay.getContext('2d');
 const aiVisionOverlay = document.getElementById('ai-vision-overlay');
@@ -35,6 +37,11 @@ const aiBridgeProtocolEl = document.getElementById('ai-bridge-protocol');
 const aiBridgeStateEl = document.getElementById('ai-bridge-state');
 const difficultyRange = document.getElementById('difficulty-range');
 const difficultyValueEl = document.getElementById('difficulty-value');
+const sensitivityRange = document.getElementById('sensitivity-range');
+const sensitivityValueEl = document.getElementById('sensitivity-value');
+const smoothingRange = document.getElementById('smoothing-range');
+const smoothingValueEl = document.getElementById('smoothing-value');
+const sensitivityPreset = document.getElementById('sensitivity-preset');
 const durationSelect = document.getElementById('duration-select');
 const roundsSelect = document.getElementById('rounds-select');
 const startButton = document.getElementById('start-button');
@@ -65,6 +72,7 @@ const state = {
   handTrackingReady: false,
   handTrackingBusy: false,
   lastVideoTime: -1,
+  lastHandLandmarks: null,
   aiVisionBridge: {
     mode: 'synthetic-yolo',
     protocol: 'window.postMessage',
@@ -97,6 +105,14 @@ const state = {
   roundSpawnTimer: null,
   aiThinkTimer: null,
   cameraStream: null,
+  handSensitivity: Number(sensitivityRange.value) / 10,
+  handSmoothing: Number(smoothingRange.value) / 10,
+  handReach: {
+    xMin: 0.18,
+    xMax: 0.82,
+    yMin: 0.05,
+    yMax: 0.72,
+  },
   pointer: {
     x: handOverlay.width * 0.5,
     y: handOverlay.height * 0.72,
@@ -279,6 +295,9 @@ function updateControls() {
   durationSelect.disabled = locked;
   roundsSelect.disabled = locked;
   difficultyRange.disabled = locked;
+  sensitivityRange.disabled = locked;
+  smoothingRange.disabled = locked;
+  sensitivityPreset.disabled = locked;
   pauseButton.disabled = !(state.status === 'playing' || state.status === 'paused');
 }
 
@@ -339,6 +358,8 @@ function updateHud() {
   timeLeftEl.textContent = `${Math.max(0, Math.ceil(state.roundTimeLeftMs / 1000))}s`;
   gameStatusEl.textContent = readableStatus(state.status);
   difficultyValueEl.textContent = String(state.difficulty);
+  sensitivityValueEl.textContent = `${state.handSensitivity.toFixed(1)}x`;
+  smoothingValueEl.textContent = state.handSmoothing.toFixed(2);
   matchScoreEl.textContent = `${state.human.roundWins} : ${state.ai.roundWins}`;
   updateControls();
   updateAIBridgeHud();
@@ -496,6 +517,44 @@ function drawHandOverlay(landmarks = null) {
   handCtx.restore();
 }
 
+function drawCameraPreviewOverlay(landmarks = null) {
+  cameraPreviewCtx.clearRect(0, 0, cameraPreviewOverlay.width, cameraPreviewOverlay.height);
+  if (!landmarks) {
+    return;
+  }
+
+  let minX = cameraPreviewOverlay.width;
+  let minY = cameraPreviewOverlay.height;
+  let maxX = 0;
+  let maxY = 0;
+
+  for (const point of landmarks) {
+    if (!point) {
+      continue;
+    }
+    const px = (1 - point.x) * cameraPreviewOverlay.width;
+    const py = point.y * cameraPreviewOverlay.height;
+    minX = Math.min(minX, px);
+    minY = Math.min(minY, py);
+    maxX = Math.max(maxX, px);
+    maxY = Math.max(maxY, py);
+  }
+
+  const padding = 10;
+  const boxX = Math.max(0, minX - padding);
+  const boxY = Math.max(0, minY - padding);
+  const boxW = Math.min(cameraPreviewOverlay.width - boxX, maxX - minX + padding * 2);
+  const boxH = Math.min(cameraPreviewOverlay.height - boxY, maxY - minY + padding * 2);
+
+  cameraPreviewCtx.save();
+  cameraPreviewCtx.strokeStyle = '#39ff14';
+  cameraPreviewCtx.lineWidth = 1.5;
+  cameraPreviewCtx.shadowColor = 'rgba(57, 255, 20, 0.28)';
+  cameraPreviewCtx.shadowBlur = 6;
+  cameraPreviewCtx.strokeRect(boxX, boxY, boxW, boxH);
+  cameraPreviewCtx.restore();
+}
+
 function drawAIVisionOverlay() {
   aiVisionCtx.clearRect(0, 0, aiVisionOverlay.width, aiVisionOverlay.height);
   if (state.status !== 'playing' && state.status !== 'paused') {
@@ -539,8 +598,9 @@ function drawAIVisionOverlay() {
   });
 }
 
-function renderSensorLayers(landmarks = null) {
+function renderSensorLayers(landmarks = state.lastHandLandmarks) {
   drawHandOverlay(landmarks);
+  drawCameraPreviewOverlay(landmarks);
   drawAIVisionOverlay();
 }
 
@@ -569,13 +629,33 @@ function syncPointerHitTarget() {
   state.pointer.insideIndex = activeIndex;
 }
 
+function remapHandCoordinate(value, min, max, size) {
+  const normalized = (value - min) / (max - min);
+  return Math.max(0, Math.min(size, normalized * size));
+}
+
 function updatePointerPosition(x, y, source = 'mouse') {
-  const dx = x - state.pointer.x;
-  const dy = y - state.pointer.y;
+  const targetX = source === 'hand'
+    ? remapHandCoordinate(x / handOverlay.width, state.handReach.xMin, state.handReach.xMax, handOverlay.width)
+    : x;
+  const targetY = source === 'hand'
+    ? remapHandCoordinate(y / handOverlay.height, state.handReach.yMin, state.handReach.yMax, handOverlay.height)
+    : y;
+  const followFactor = source === 'hand'
+    ? Math.max(0.12, Math.min(1, state.handSensitivity * (1 - state.handSmoothing) + 0.08))
+    : 1;
+  const nextX = source === 'hand'
+    ? state.pointer.x + (targetX - state.pointer.x) * followFactor
+    : targetX;
+  const nextY = source === 'hand'
+    ? state.pointer.y + (targetY - state.pointer.y) * followFactor
+    : targetY;
+  const dx = nextX - state.pointer.x;
+  const dy = nextY - state.pointer.y;
   state.pointer.lastX = state.pointer.x;
   state.pointer.lastY = state.pointer.y;
-  state.pointer.x = Math.max(0, Math.min(handOverlay.width, x));
-  state.pointer.y = Math.max(0, Math.min(handOverlay.height, y));
+  state.pointer.x = Math.max(0, Math.min(handOverlay.width, nextX));
+  state.pointer.y = Math.max(0, Math.min(handOverlay.height, nextY));
   state.pointer.speed = Math.hypot(dx, dy);
   state.pointer.source = source;
   syncPointerHitTarget();
@@ -688,6 +768,7 @@ function runHandTrackingLoop() {
   const result = state.handLandmarker.detectForVideo(cameraFeed, performance.now());
   const landmarks = result.landmarks?.[0];
   if (landmarks) {
+    state.lastHandLandmarks = landmarks;
     const palm = landmarks[9] || landmarks[0];
     updatePointerPosition((1 - palm.x) * handOverlay.width, palm.y * handOverlay.height, 'hand');
     maybeTriggerHandStrike(landmarks);
@@ -695,9 +776,10 @@ function runHandTrackingLoop() {
     trackerStatusTextEl.textContent = state.pointer.speed > 18 ? 'Hand Swing Captured' : 'Hand Locked';
     renderSensorLayers(landmarks);
   } else {
+    state.lastHandLandmarks = null;
     handStatusEl.textContent = state.handTrackingReady ? 'Show Hand To Camera' : 'Tracking Offline';
     trackerStatusTextEl.textContent = state.handTrackingReady ? 'Show Hand To Camera' : 'Tracking Offline';
-    renderSensorLayers();
+    renderSensorLayers(null);
   }
 
   state.handTrackingBusy = false;
@@ -1210,6 +1292,20 @@ roundsSelect.addEventListener('change', () => {
   state.totalRounds = Number(roundsSelect.value);
   updateHud();
 });
+sensitivityRange.addEventListener('input', () => {
+  state.handSensitivity = Number(sensitivityRange.value) / 10;
+  syncPresetSelect();
+  updateHud();
+});
+smoothingRange.addEventListener('input', () => {
+  state.handSmoothing = Number(smoothingRange.value) / 10;
+  syncPresetSelect();
+  updateHud();
+});
+sensitivityPreset.addEventListener('change', () => {
+  applyControlPreset(sensitivityPreset.value);
+  updateHud();
+});
 document.addEventListener('keydown', (event) => {
   if (event.code === 'Space') {
     event.preventDefault();
@@ -1239,6 +1335,7 @@ async function boot() {
   publishBridgeContract();
   startHttpBridge();
   mountBoards();
+  applyControlPreset(sensitivityPreset.value);
   await setupCameraPreview();
   await initHandTracking();
   resetMatch();

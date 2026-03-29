@@ -53,7 +53,9 @@
             <strong id="ai-score">0</strong>
             <div class="camera-preview-card">
               <span>Live Camera</span>
-              <video id="camera-preview" class="camera-preview" autoplay playsinline muted></video>
+              <div class="camera-preview-stage">
+                <video id="camera-preview" class="camera-preview" autoplay playsinline muted></video>
+<canvas id="camera-preview-overlay" class="camera-preview-overlay" width="600" height="440"></canvas>              </div>
             </div>
             <span id="ai-hit-rate">Hit 0%</span>
           </div>
@@ -127,6 +129,31 @@
               <option value="1" selected>Single Round</option>
               <option value="3">Best of 3</option>
               <option value="5">Best of 5</option>
+            </select>
+          </div>
+
+          <div class="control-group compact-group">
+            <label for="sensitivity-range">Hammer Sensitivity</label>
+            <div class="range-wrap">
+              <input id="sensitivity-range" type="range" min="1" max="30" value="12" />
+              <strong id="sensitivity-value">1.2x</strong>
+            </div>
+          </div>
+
+          <div class="control-group compact-group">
+            <label for="smoothing-range">Motion Smoothing</label>
+            <div class="range-wrap">
+              <input id="smoothing-range" type="range" min="1" max="10" value="6" />
+              <strong id="smoothing-value">0.60</strong>
+            </div>
+          </div>
+
+          <div class="control-group compact-group">
+            <label for="sensitivity-preset">Control Preset</label>
+            <select id="sensitivity-preset">
+              <option value="steady">稳</option>
+              <option value="standard" selected>标准</option>
+              <option value="aggressive">激进</option>
             </select>
           </div>
 
