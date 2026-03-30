@@ -366,6 +366,22 @@ function updateHud() {
   renderHistory();
 }
 
+function applyControlPreset(preset) {
+  const settings = {
+    steady: { sensitivity: 0.9, smoothing: 0.75 },
+    standard: { sensitivity: 1.2, smoothing: 0.6 },
+    aggressive: { sensitivity: 1.8, smoothing: 0.35 },
+  };
+  const next = settings[preset] || settings.standard;
+
+  state.handSensitivity = next.sensitivity;
+  state.handSmoothing = next.smoothing;
+  sensitivityRange.value = String(Math.round(next.sensitivity * 10));
+  smoothingRange.value = String(Math.round(next.smoothing * 10));
+  sensitivityPreset.value = settings[preset] ? preset : 'standard';
+  updateHud();
+}
+
 function clearBoard(boardKey) {
   state.boards[boardKey].holes.forEach((hole) => {
     hole.active = false;
